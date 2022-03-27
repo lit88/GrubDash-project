@@ -27,31 +27,45 @@ function create(req, res, next) {
     res.status(201).json({ data: newDish })
 }
 
+function read(req, res, next) {
+    res.json({ data: res.locals.dish })
+}
+
+function update(req, res, next) {
+    const dish = res.locals.dish
+    const { data: { name, description, price, image_url } = {} } = req.body
+    dish.name = name
+    dish.description = description
+    dish.price = price
+    dish.image_url = image_url
+    res.json({ data: dish })
+}
+
 
 // validations
 
 function bodyDataHas(propertyName) {
     return function (req, res, next) {
-      const { data = {} } = req.body;
+      const { data = {} } = req.body
       if (data[propertyName]) {
-        return next();
+        return next()
       }
-      next({ status: 400, message: `Dish must include a ${propertyName}` });
-    };
+      next({ status: 400, message: `Dish must include a ${propertyName}` })
+    }
 }
 
 function bodyIsNotEmpty(propertyName){
     return function (req, res, next) {
-        const { data = {} } = req.body;
+        const { data = {} } = req.body
       if (data[propertyName] !== "") {
         return next();
       }
-      next({ status: 400, message: `Dish must include a ${propertyName}` });
+      next({ status: 400, message: `Dish must include a ${propertyName}` })
     }
 }
 
 function priceIsValidNumber(req, res, next){
-    const { data: { price }  = {} } = req.body;
+    const { data: { price }  = {} } = req.body
     if (price <= 0 || !Number.isInteger(price)){
         return next({
             status: 400,
@@ -59,6 +73,31 @@ function priceIsValidNumber(req, res, next){
         });
     }
     next();
+}
+
+function dishExists(req, res, next) {
+    const { dishId } = req.params
+    const foundDish = dishes.find(dish => dish.id === dishId)
+    if (foundDish) {
+      res.locals.dish = foundDish
+      return next()
+    }
+    next({
+      status: 404,
+      message: `Dish does not exist: ${dishId}.`,
+    })
+}
+
+function matchingId(req, res, next) {
+    const { dishId } = req.params
+    const { data: { id }  = {} } = req.body
+    if ( id === null || id === undefined || id === "" || id === dishId ) {
+        return next()
+    }
+    next({
+        status: 400,
+        message: `Dish id does not match route id. Dish: ${id}, Route: ${dishId}`,
+    })
 }
 
 
@@ -74,4 +113,21 @@ module.exports = {
         bodyIsNotEmpty("image_url"),
         priceIsValidNumber,
         create],
+    read: [
+        dishExists,
+        read
+    ],
+    update: [
+        dishExists,
+        matchingId,
+        bodyIsNotEmpty("name"),
+        bodyIsNotEmpty("description"),
+        bodyIsNotEmpty("image_url"),
+        bodyDataHas("name"),
+        bodyDataHas("description"),
+        bodyDataHas("price"),
+        bodyDataHas("image_url"),
+        priceIsValidNumber,
+        update
+    ],
 }
