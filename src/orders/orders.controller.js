@@ -31,6 +31,22 @@ function read(req, res, next) {
     res.json({ data: res.locals.order })
 }
 
+function update(req, res, next) {
+    const order = res.locals.order
+    const { data: { deliverTo, mobileNumber, status, dishes } = {} } = req.body
+    order.deliverTo = deliverTo
+    order.mobileNumber = mobileNumber
+    order.status = status
+    order.dishes = dishes
+    res.json({ data: order })
+}
+
+function destroy(req, res, next) {
+    const order = res.locals.order
+    const deletedOrder = orders.splice(order.index, 1)
+    res.sendStatus(204)
+}
+
 // verifications
 
 function bodyDataHas(propertyName) {
@@ -79,6 +95,46 @@ function orderExists(req, res, next) {
     })
 }
 
+function matchingId(req, res, next) {
+    const { orderId } = req.params
+    const { data: { id }  = {} } = req.body
+    if ( id === null || id === undefined || id === "" || id === orderId ) {
+        return next()
+    }
+    next({
+        status: 400,
+        message: `Order id does not match route id. Order: ${id}, Route: ${orderId}.`,
+    })
+}
+
+function statusVerify(req, res, next) {
+    const { data: { status }  = {} } = req.body
+    if(status !== "delivered" && status !== "pending" && status !== "preparing" && status !== "out-for-delivery"){
+        return next({
+            status: 400,
+            message: `Order must have a status of pending, preparing, out-for-delivery, delivered`,
+        })
+    }
+    if(status === "delivered"){
+        return next({
+            status: 400,
+            message: `A delivered order cannot be changed`
+        })
+    }
+    next()
+}
+
+function deletePending(req, res, next){
+    const order = res.locals.order
+    if ( order.status !== "pending" ){
+        return next({
+            status: 400,
+            message: `An order cannot be deleted unless it is pending`,
+        })
+    }
+    next()
+}
+
 
 module.exports = {
     list,
@@ -92,4 +148,21 @@ module.exports = {
     ],
     read: [orderExists,
         read],
+    update: [
+        orderExists,
+        bodyDataHas("deliverTo"),
+        bodyDataHas("mobileNumber"),
+        bodyDataHas("dishes"),
+        bodyDataHas("status"),
+        dishesVerify,
+        quantityVerify,
+        matchingId,
+        statusVerify,
+        update
+    ],
+    delete: [
+        orderExists,
+        deletePending,
+        destroy,
+    ]
 }
