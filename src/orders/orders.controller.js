@@ -27,6 +27,10 @@ function create(req, res, next) {
     res.status(201).json({ data: newOrder })
 }
 
+function read(req, res, next) {
+    res.json({ data: res.locals.order })
+}
+
 // verifications
 
 function bodyDataHas(propertyName) {
@@ -40,7 +44,39 @@ function bodyDataHas(propertyName) {
 }
 
 function dishesVerify(req, res, next) {
-    const { data = { dishes } } = req.body
+    const { data: { dishes } = {} } = req.body
+    if (Array.isArray(dishes) && dishes.length > 0) {
+        return next()
+    }
+    next({
+        status: 400,
+        message: `Order must include at least one dish`,
+    })
+}
+
+function quantityVerify(req, res, next) {
+    const { data: { dishes } = {} } = req.body
+    dishes.map((dish, index) => {
+        if( !dish.quantity || dish.quantity <= 0 || !Number.isInteger(dish.quantity)) {
+        return next({
+            status: 400,
+            message: `Dish ${index} must have a quantity that is an integer greater than 0`,
+        })
+    }})
+    next()
+}
+
+function orderExists(req, res, next) {
+    const { orderId } = req.params
+    const foundOrder = orders.find((order)=> order.id === orderId)
+    if(foundOrder) {
+        res.locals.order = foundOrder
+        next()
+    }
+    next({
+        status: 404,
+        message: `Order does not exist: ${orderId}.`
+    })
 }
 
 
@@ -50,6 +86,10 @@ module.exports = {
         bodyDataHas("deliverTo"),
         bodyDataHas("mobileNumber"),
         bodyDataHas("dishes"),
+        dishesVerify,
+        quantityVerify,
         create
     ],
+    read: [orderExists,
+        read],
 }
